@@ -1,15 +1,20 @@
-FROM php:8.2-cli
-
-WORKDIR /var/www
-
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Copy composer files first (for cache)
+FROM composer:2 AS vendor
+WORKDIR /app
 COPY composer.json composer.lock ./
+RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader --no-scripts
 
-RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --prefer-dist
+FROM php:8.2-cli
+WORKDIR /app
 
-# Then copy rest of app
-COPY . .
+# Required PHP extensions for Laravel + MySQL
+RUN docker-php-ext-install pdo pdo_mysql
 
-CMD php artisan migrate --force && php -S 0.0.0.0:${PORT} -t public
+# Copy application and Composer dependencies
+COPY . /app
+COPY --from=vendor /app/vendor /app/vendor
+
+# Railway injects PORT at runtime; default to 8080 for local Docker runs
+CMD ["sh", "-c", "php artisan optimize:clear && php artisan migrate --force && php -S 0.0.0.0:${PORT:-8080} -t public"]
+
+
+
