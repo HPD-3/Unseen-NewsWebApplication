@@ -14,4 +14,4 @@ COPY . /app
 COPY --from=vendor /app/vendor /app/vendor
 
 # Railway injects PORT at runtime; default to 8080 for local Docker runs
-CMD ["sh", "-c", "php -S 0.0.0.0:${PORT:-8080} -t public"]
+CMD ["sh", "-c", "php artisan optimize:clear && php artisan migrate --force && php -S 0.0.0.0:${PORT:-8080} -t public"]
