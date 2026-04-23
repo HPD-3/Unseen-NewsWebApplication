@@ -1,17 +1,27 @@
-FROM composer:2 AS vendor
-WORKDIR /app
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader --no-scripts
-
 FROM php:8.2-cli
-WORKDIR /app
 
-# Required PHP extensions for Laravel + MySQL
-RUN docker-php-ext-install pdo pdo_mysql
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git unzip curl libzip-dev libonig-dev libxml2-dev \
+    && docker-php-ext-install pdo pdo_mysql zip
 
-# Copy application and Composer dependencies
-COPY . /app
-COPY --from=vendor /app/vendor /app/vendor
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Railway injects PORT at runtime; default to 8080 for local Docker runs
-CMD php -S 0.0.0.0:$PORT -t public
+# Set working directory
+WORKDIR /var/www
+
+# Copy project files
+COPY . .
+
+# Install Laravel dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# Laravel setup
+RUN cp .env.example .env && php artisan key:generate
+
+# Expose Railway port
+EXPOSE 8080
+
+# Start Laravel
+CMD php artisan config:clear && php artisan migrate --force && php -S 0.0.0.0:${PORT} -t public
